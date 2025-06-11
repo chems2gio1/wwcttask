@@ -1,4 +1,3 @@
-export const runtime = 'experimental-edge'
 import Head from 'next/head'
 import Image from 'next/image'
 import { useRouter } from 'next/router'
@@ -12,171 +11,71 @@ import Footer from '../../components/Footer'
 import { getAuthPersonInfo, requestTokenWithAuthCode, sendTokenToServer } from '../../utils/oAuthHandler'
 import { LoadingIcon } from '../../components/Loading'
 
-// export const runtime = 'experimental-edge'
+export const runtime = 'edge'
 
 export default function OAuthStep3({ accessToken, expiryTime, refreshToken, error, description, errorUri }) {
   const router = useRouter()
-  const [expiryTimeLeft, setExpiryTimeLeft] = useState(expiryTime)
+  const [expiryTimeLeft, setExpiryTimeLeft] = useState(expiryTime || 0)
+  const [buttonContent, setButtonContent] = useState(<span>Store tokens <FontAwesomeIcon icon="key" /></span>)
+  const [buttonError, setButtonError] = useState(false)
 
   useEffect(() => {
     if (!expiryTimeLeft) return
-
-    const intervalId = setInterval(() => {
-      setExpiryTimeLeft(expiryTimeLeft - 1)
+    const interval = setInterval(() => {
+      setExpiryTimeLeft(prev => prev - 1)
     }, 1000)
-
-    return () => clearInterval(intervalId)
+    return () => clearInterval(interval)
   }, [expiryTimeLeft])
 
-  const [buttonContent, setButtonContent] = useState(
-    <div>
-      <span>{'Store tokens'}</span> <FontAwesomeIcon icon="key" />
-    </div>
-  )
-  const [buttonError, setButtonError] = useState(false)
-
-  const sendAuthTokensToServer = async () => {
+  const handleStoreToken = async () => {
     setButtonError(false)
-    setButtonContent(
-      <div>
-        <span>{'Storing tokens'}</span> <LoadingIcon className="ml-1 inline h-4 w-4 animate-spin" />
-      </div>
-    )
-
-    await sendTokenToServer(accessToken, refreshToken, expiryTime)
-      .then(() => {
-        setButtonError(false)
-        setButtonContent(
-          <div>
-            <span>{'Stored! Going home...'}</span> <FontAwesomeIcon icon="check" />
-          </div>
-        )
-        setTimeout(() => {
-          router.push('/')
-        }, 2000)
-      })
-      .catch(_ => {
-        setButtonError(true)
-        setButtonContent(
-          <div>
-            <span>{'Error storing the token'}</span> <FontAwesomeIcon icon="exclamation-circle" />
-          </div>
-        )
-      })
+    setButtonContent(<span>Storing... <LoadingIcon className="ml-1 inline h-4 w-4 animate-spin" /></span>)
+    try {
+      await sendTokenToServer(accessToken, refreshToken, expiryTime)
+      setButtonContent(<span>Stored! Redirecting... <FontAwesomeIcon icon="check" /></span>)
+      setTimeout(() => router.push('/'), 2000)
+    } catch {
+      setButtonError(true)
+      setButtonContent(<span>Error storing token <FontAwesomeIcon icon="exclamation-circle" /></span>)
+    }
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-white dark:bg-gray-900">
+    <div className="flex min-h-screen flex-col bg-white dark:bg-gray-900">
       <Head>
-        <title>{`OAuth Step 3 - ${siteConfig.title}`}</title>
+        <title>OAuth Step 3 - {siteConfig.title}</title>
       </Head>
-
-      <main className="flex w-full flex-1 flex-col bg-gray-50 dark:bg-gray-800">
-        <Navbar />
-
-        <div className="mx-auto w-full max-w-5xl p-4">
-          <div className="rounded bg-white p-3 dark:bg-gray-900 dark:text-gray-100">
-            <div className="mx-auto w-52">
-              <Image
-                src="/images/fabulous-celebration.png"
-                width={912}
-                height={912}
-                alt="fabulous celebration"
-                priority
-              />
-            </div>
-            <h3 className="mb-4 text-center text-xl font-medium">{'Welcome to your new onedrive-cf-index-ng 🎉'}</h3>
-
-            <h3 className="mb-2 mt-4 text-lg font-medium">{'Step 3/3: Get access and refresh tokens'}</h3>
-            {error ? (
-              <div>
-                <p className="py-1 font-medium text-red-500">
-                  <FontAwesomeIcon icon="exclamation-circle" className="mr-2" />
-                  <span>{`Whoops, looks like we got a problem: ${error}.`}</span>
-                </p>
-                <p className="my-2 whitespace-pre-line rounded border border-gray-400/20 bg-gray-50 p-2 font-mono text-sm opacity-80 dark:bg-gray-800">
-                  {description}
-                </p>
-                {errorUri && (
-                  <p>
-                    Check out{' '}
-                    <a
-                      href={errorUri}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline dark:text-blue-500"
-                    >
-                      {/* eslint-disable-next-line react/no-unescaped-entities */}
-                      Microsoft's official explanation
-                    </a>{' '}
-                    on the error message.
-                  </p>
-                )}
-                <div className="mb-2 mt-6 text-right">
-                  <button
-                    className="rounded-lg bg-gradient-to-br from-red-500 to-orange-400 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-gradient-to-bl focus:ring-4 focus:ring-red-200 disabled:cursor-not-allowed disabled:grayscale dark:focus:ring-red-800"
-                    onClick={() => {
-                      router.push('/onedrive-oauth/step-1')
-                    }}
-                  >
-                    <FontAwesomeIcon icon="arrow-left" /> <span>{'Restart'}</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <p className="py-1 font-medium">{'Success! The API returned what we needed.'}</p>
-                <ol className="py-1">
-                  {accessToken && (
-                    <li>
-                      <FontAwesomeIcon icon={['far', 'check-circle']} className="text-green-500" />{' '}
-                      <span>
-                        {'Acquired access_token: '}
-                        <code className="font-mono text-sm opacity-80">{`${accessToken.substring(0, 60)}...`}</code>
-                      </span>
-                    </li>
-                  )}
-                  {refreshToken && (
-                    <li>
-                      <FontAwesomeIcon icon={['far', 'check-circle']} className="text-green-500" />{' '}
-                      <span>
-                        {'Acquired refresh_token: '}
-                        <code className="font-mono text-sm opacity-80">{`${refreshToken.substring(0, 60)}...`}</code>
-                      </span>
-                    </li>
-                  )}
-                </ol>
-
-                <p className="py-1 text-sm font-medium text-teal-500">
-                  <FontAwesomeIcon icon="exclamation-circle" className="mr-1" />{' '}
-                  {'These tokens may take a few seconds to populate after you click the button below. ' +
-                    'If you go back home and still see the welcome page telling you to re-authenticate, ' +
-                    'revisit home and do a hard refresh.'}
-                </p>
-                <p className="py-1">
-                  {'Final step, click the button below to store these tokens persistently before they expire ' +
-                    `after ${Math.floor(expiryTimeLeft / 60)} minutes ${expiryTimeLeft - Math.floor(expiryTimeLeft / 60) * 60
-                    } seconds. ` +
-                    "Don't worry, after storing them, onedrive-cf-index-ng will take care of token refreshes and updates after your site goes live."}
-                </p>
-
-                <div className="mb-2 mt-6 text-right">
-                  <button
-                    className={`rounded-lg bg-gradient-to-br px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-gradient-to-bl focus:ring-4 ${buttonError
-                      ? 'from-red-500 to-orange-400 focus:ring-red-200 dark:focus:ring-red-800'
-                      : 'from-green-500 to-teal-300 focus:ring-green-200 dark:focus:ring-green-800'
-                      }`}
-                    onClick={sendAuthTokensToServer}
-                  >
-                    {buttonContent}
-                  </button>
-                </div>
-              </div>
-            )}
+      <Navbar />
+      <main className="flex flex-1 flex-col items-center justify-center px-4">
+        <div className="max-w-2xl w-full bg-white dark:bg-gray-800 p-6 rounded shadow">
+          <div className="w-40 mx-auto mb-4">
+            <Image src="/images/fabulous-celebration.png" width={160} height={160} alt="celebration" priority />
           </div>
+          <h2 className="text-xl font-semibold text-center mb-4">Step 3/3: Finalize authentication</h2>
+          {error ? (
+            <div className="text-red-500">
+              <p><FontAwesomeIcon icon="exclamation-circle" /> Error: {error}</p>
+              <pre className="bg-gray-100 dark:bg-gray-700 p-2 mt-2 text-sm whitespace-pre-wrap">{description}</pre>
+              {errorUri && <a className="text-blue-500 underline" href={errorUri} target="_blank">Learn more</a>}
+              <button className="mt-4 bg-red-500 text-white px-4 py-2 rounded" onClick={() => router.push('/onedrive-oauth/step-1')}>
+                <FontAwesomeIcon icon="arrow-left" /> Restart
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="mb-2">✅ Authentication successful!</p>
+              <ul className="text-sm">
+                <li><strong>Access token:</strong> <code>{accessToken?.substring(0, 60)}...</code></li>
+                <li><strong>Refresh token:</strong> <code>{refreshToken?.substring(0, 60)}...</code></li>
+              </ul>
+              <p className="mt-4 text-teal-500">Tokens will expire in: {Math.floor(expiryTimeLeft / 60)}m {expiryTimeLeft % 60}s</p>
+              <button className={`mt-4 px-4 py-2 rounded text-white ${buttonError ? 'bg-red-500' : 'bg-green-500'}`} onClick={handleStoreToken}>
+                {buttonContent}
+              </button>
+            </div>
+          )}
         </div>
       </main>
-
       <Footer />
     </div>
   )
@@ -184,59 +83,33 @@ export default function OAuthStep3({ accessToken, expiryTime, refreshToken, erro
 
 export async function getServerSideProps({ query }) {
   const { authCode } = query
-
-  console.log(authCode)
-
-  // Return if no auth code is present
   if (!authCode) {
+    return { props: { error: 'Missing authCode', description: 'You must complete step 2 before this step.' } }
+  }
+
+  const tokenResponse = await requestTokenWithAuthCode(authCode)
+  if ('error' in tokenResponse) {
     return {
       props: {
-        error: 'No auth code present',
-        description: 'Where is the auth code? Did you follow step 2 you silly donut?',
+        error: tokenResponse.error,
+        description: tokenResponse.errorDescription,
+        errorUri: tokenResponse.errorUri,
       },
     }
   }
 
-  const response = await requestTokenWithAuthCode(authCode)
-
-  // If error response, return invalid
-  if ('error' in response) {
-    return {
-      props: {
-        error: response.error,
-        description: response.errorDescription,
-        errorUri: response.errorUri,
-      },
-    }
-  }
-
-  const { expiryTime, accessToken, refreshToken } = response
-
-  // verify identity of the authenticated user with the Microsoft Graph API
+  const { expiryTime, accessToken, refreshToken } = tokenResponse
   const { data, status } = await getAuthPersonInfo(accessToken)
+
   if (status !== 200) {
-    return {
-      props: {
-        error: "Non-200 response from Microsoft Graph API",
-        description: JSON.stringify(data)
-      },
-    }
+    return { props: { error: 'Graph API error', description: JSON.stringify(data) } }
   }
+
   if (data.userPrincipalName !== siteConfig.userPrincipalName) {
-    return {
-      props: {
-        error: "Do not pretend to be the owner!",
-        description: "Authenticated user: " + data.userPrincipalName + "\n" + "UserPrincipalName in your config should match the authenticated user here!"
-      },
-    }
+    return { props: { error: 'Invalid user', description: `Expected ${siteConfig.userPrincipalName}, got ${data.userPrincipalName}` } }
   }
 
   return {
-    props: {
-      error: null,
-      expiryTime,
-      accessToken,
-      refreshToken,
-    },
+    props: { error: null, expiryTime, accessToken, refreshToken },
   }
 }
