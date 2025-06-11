@@ -11,7 +11,7 @@ import Footer from '../../components/Footer'
 import { getAuthPersonInfo, requestTokenWithAuthCode, sendTokenToServer } from '../../utils/oAuthHandler'
 import { LoadingIcon } from '../../components/Loading'
 
-export const runtime = 'edge'
+export const runtime = 'experimental-edge'
 
 export default function OAuthStep3({ accessToken, expiryTime, refreshToken, error, description, errorUri }) {
   const router = useRouter()
